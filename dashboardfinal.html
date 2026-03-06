@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedCare Hospital - Management Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-light: #1e293b;
+            --fg: #f1f5f9;
+            --muted: #64748b;
+            --accent: #06b6d4;
+            --accent-dark: #0891b2;
+            --card: #1e293b;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * { font-family: 'Plus Jakarta Sans', sans-serif; }
+        h1, h2, h3, .font-display { font-family: 'Space Grotesk', sans-serif; }
+        body { background: var(--bg); color: var(--fg); }
+
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        .sidebar-item:hover, .sidebar-item.active {
+            background: linear-gradient(90deg, rgba(6, 182, 212, 0.15), transparent);
+            border-left-color: var(--accent);
+        }
+        
+        .dept-item { transition: all 0.2s ease; }
+        .dept-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .dept-item.active {
+            background: rgba(6, 182, 212, 0.1);
+            border-left: 3px solid var(--accent);
+        }
+
+        .card-glow { position: relative; overflow: hidden; }
+        .card-glow::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+        .input-dark {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+        .input-dark:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+            outline: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.5);
+        }
+        .pulse-animation { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .grid-bg {
+            background-image: 
+                linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .status-dot { animation: statusPulse 2s ease-in-out infinite; }
+        @keyframes statusPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        .scrollbar-custom::-webkit-scrollbar { width: 6px; }
+        .scrollbar-custom::-webkit-scrollbar-track { background: var(--bg); }
+        .scrollbar-custom::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+        /* Custom File Input Styling */
+        .file-input::file-selector-button {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .file-input::file-selector-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+        }
+
+        /* Custom Search List Styles for Billing */
+        .search-results-container {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+            background: #1e293b; border: 1px solid var(--border); border-radius: 0.75rem;
+            margin-top: 4px; max-height: 200px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: none;
+        }
+        .search-results-container.active { display: block; }
+        .search-result-item {
+            padding: 10px 16px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: rgba(6, 182, 212, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen grid-bg">
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <div class="bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-slate-700 card-glow">
+                <div class="text-center mb-8">
+                    <div class="inline-flex items-center gap-3 mb-6">
+                        <div class="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-xl flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        </div>
+                        <span class="text-2xl font-bold font-display bg-gradient-to-r from-cyan-400 to-cyan-300 bg-clip-text text-transparent">MedCare</span>
+                    </div>
+                    <h1 class="text-2xl font-bold font-display mb-2">Hospital Management</h1>
+                    <p class="text-slate-400 text-sm">Sign in to access the dashboard</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Hospital ID</label>
+                        <input type="text" id="hospitalId" placeholder="HOSP-XXXXX" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                        <input type="password" id="hospitalPassword" placeholder="Enter password" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                    </div>
+                    <button onclick="handleAdminLogin()" class="w-full py-3.5 rounded-xl btn-primary text-white font-semibold">Sign In</button>
+                </div>
+
+                <div class="mt-6 p-4 bg-slate-900/50 rounded-xl">
+                    <p class="text-xs text-slate-400 text-center">
+                        Demo: Use <span class="text-cyan-400">HOSP-DEMO</span> / <span class="text-cyan-400">admin123</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardScreen" class="hidden min-h-screen flex">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900/50 backdrop-blur border-r border-slate-800 flex flex-col fixed h-full z-40">
+            <div class="p-5 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <div>
+                        <div class="font-bold font-display text-cyan-400">MedCare</div>
+                        <div class="text-xs text-slate-500">Management Portal</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-custom">
+                <button onclick="showAdminSection('dashboard')" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left" data-section="dashboard">
+                    <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span class="text-sm font-medium">Dashboard</span>
+                </button>
+                
+                <button onclick="showAdminSection('patients')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left" data-section="patients">
+                    <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span class="text-sm font-medium">Patients</span>
+                </button>
+
+                <button onclick="showAdminSection('doctors')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left" data-section="doctors">
+                    <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <span class="text-sm font-medium">Doctors & Tokens</span>
+                </button>
+
+                <!-- Billing & Pharmacy Button Added -->
+                <button onclick="showAdminSection('billing')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left" data-section="billing">
+                    <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    <span class="text-sm font-medium">Billing & Pharmacy</span>
+                </button>
+
+                <button onclick="showAdminSection('uploads')" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left" data-section="uploads">
+                    <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span class="text-sm font-medium">Upload Records</span>
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800">
+                <button onclick="handleAdminLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span class="text-sm font-medium">Sign Out</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 ml-64 p-6">
+            <!-- Header -->
+            <header class="flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold font-display" id="pageTitle">Dashboard</h1>
+                    <p class="text-slate-400 text-sm" id="pageSubtitle">Overview of hospital operations</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium">Admin User</div>
+                        <div class="text-xs text-slate-500">HOSP-DEMO</div>
+                    </div>
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold">A</div>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section id="dashboardSection" class="section-content fade-in">
+                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-slate-800/50 rounded-2xl p-5 border border-slate-700 card-glow">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                            </div>
+                            <span class="text-xs text-green-400 font-semibold">+12%</span>
+                        </div>
+                        <div class="text-3xl font-bold text-white mb-1" id="totalPatients">0</div>
+                        <div class="text-sm text-slate-400">Total Patients</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-2xl p-5 border border-slate-700 card-glow">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            </div>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-400 rounded-full status-dot"></span><span class="text-xs text-green-400">Live</span></span>
+                        </div>
+                        <div class="text-3xl font-bold text-white mb-1" id="activeDoctorsCount">0</div>
+                        <div class="text-sm text-slate-400">Active Doctors</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-2xl p-5 border border-slate-700 card-glow">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-white mb-1" id="totalDepts">0</div>
+                        <div class="text-sm text-slate-400">Departments</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-2xl p-5 border border-slate-700 card-glow">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-white mb-1">12m</div>
+                        <div class="text-sm text-slate-400">Avg. Wait Time</div>
+                    </div>
+                </div>
+
+                <!-- Live Token Board -->
+                <div class="bg-slate-800/50 rounded-2xl border border-slate-700 mb-8 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold font-display">Live Token Board</h3>
+                            <p class="text-sm text-slate-400">Real-time token status across departments</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 bg-green-400 rounded-full pulse-animation"></span>
+                            <span class="text-sm text-green-400">Live</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-slate-900/50">
+                                <tr>
+                                    <th class="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase">Department</th>
+                                    <th class="text-left py-3 px-6 text-xs font-semibold text-slate-400 uppercase">Doctor</th>
+                                    <th class="text-center py-3 px-6 text-xs font-semibold text-slate-400 uppercase">Current Token</th>
+                                    <th class="text-center py-3 px-6 text-xs font-semibold text-slate-400 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardTokenBoardBody">
+                                <tr>
+                                    <td colspan="4" class="py-8 text-center text-slate-500">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Patients Section -->
+            <section id="patientsSection" class="section-content hidden">
+                <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                    <div class="flex-1">
+                        <input type="text" id="patientSearch" placeholder="Search by Patient ID or Name..." class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500" onkeyup="searchPatients(this.value)">
+                    </div>
+                    <button onclick="openAddPatientModal()" class="px-6 py-3 rounded-xl btn-primary text-white font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        Add Patient
+                    </button>
+                </div>
+                <div class="bg-slate-800/50 rounded-2xl border border-slate-700 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-slate-900/50">
+                                <tr>
+                                    <th class="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase">Patient ID</th>
+                                    <th class="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase">Name</th>
+                                    <th class="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase">Email</th>
+                                    <th class="text-left py-4 px-6 text-xs font-semibold text-slate-400 uppercase">Phone</th>
+                                    <th class="text-center py-4 px-6 text-xs font-semibold text-slate-400 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patientsTableBody">
+                                <tr>
+                                    <td colspan="5" class="py-8 text-center text-slate-500">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Doctors & Tokens Section -->
+            <section id="doctorsSection" class="section-content hidden">
+                <div class="flex gap-6 h-[calc(100vh-150px)]">
+                    <!-- Departments Sidebar -->
+                    <div class="w-72 bg-slate-800/50 rounded-2xl border border-slate-700 flex flex-col">
+                        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                            <h3 class="font-bold font-display text-lg">Departments</h3>
+                            <button onclick="openAddDeptModal()" class="p-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            </button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto scrollbar-custom p-2" id="departmentsListSidebar">
+                            <div class="text-center py-8 text-slate-500">Loading...</div>
+                        </div>
+                    </div>
+
+                    <!-- Doctors List -->
+                    <div class="flex-1 bg-slate-800/50 rounded-2xl border border-slate-700 flex flex-col">
+                        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold font-display text-lg" id="doctorListTitle">All Doctors</h3>
+                                <p class="text-xs text-slate-400" id="doctorListSubtitle">Manage doctors and tokens</p>
+                            </div>
+                            <button onclick="openAddDoctorModal()" class="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-semibold hover:bg-cyan-600 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                                Add Doctor
+                            </button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 scrollbar-custom">
+                            <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4" id="doctorsGrid">
+                                <div class="col-span-full text-center py-8 text-slate-500">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BILLING & PHARMACY SECTION -->
+            <section id="billingSection" class="section-content hidden">
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <!-- Left Column: Search & Add -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <!-- Patient Search Card -->
+                        <div class="bg-slate-800/50 rounded-2xl border border-slate-700 p-6">
+                            <h3 class="font-bold font-display mb-4">1. Search Patient</h3>
+                            <div class="relative">
+                                <input type="text" id="billPatientSearchInput" placeholder="Type Name or ID..." class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white" oninput="handlePatientSearchInput(this.value)" onfocus="handlePatientSearchInput(this.value)">
+                                <div id="patientSearchResults" class="search-results-container scrollbar-custom"></div>
+                            </div>
+                            <div id="selectedPatientInfo" class="mt-4 hidden">
+                                <div class="flex items-center gap-3 p-3 bg-slate-900/50 rounded-xl border border-cyan-500/30">
+                                    <div class="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400 font-bold">P</div>
+                                    <div><div class="font-medium" id="billPatientName">-</div><div class="text-xs text-slate-400" id="billPatientId">-</div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add Medicine Card -->
+                        <div class="bg-slate-800/50 rounded-2xl border border-slate-700 p-6">
+                            <h3 class="font-bold font-display mb-4">2. Add Medicine</h3>
+                            <div class="space-y-3">
+                                <div class="relative">
+                                    <input type="text" id="billMedName" placeholder="Search Medicine..." class="w-full px-4 py-2.5 rounded-lg input-dark outline-none text-white text-sm" oninput="handleMedicineSearchInput(this.value)" onfocus="handleMedicineSearchInput(this.value)">
+                                    <div id="medicineSearchResults" class="search-results-container scrollbar-custom"></div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="text" id="billMedDosage" placeholder="Dosage (e.g. 500mg)" class="w-full px-4 py-2.5 rounded-lg input-dark outline-none text-white text-sm">
+                                    <input type="number" id="billMedQty" placeholder="Qty" class="w-full px-4 py-2.5 rounded-lg input-dark outline-none text-white text-sm" oninput="updateLivePrice()">
+                                </div>
+                                
+                                <div class="px-4 py-3 rounded-lg bg-slate-900 text-slate-300 text-sm flex items-center justify-between">
+                                    <span>Est. Price:</span>
+                                    <span id="liveMedPrice" class="text-green-400 font-bold text-lg">₹ 0</span>
+                                </div>
+                                
+                                <button onclick="addToCurrentBill()" class="w-full py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-semibold transition-all">Add to Bill</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Bill View -->
+                    <div class="lg:col-span-2 bg-slate-800/50 rounded-2xl border border-slate-700 overflow-hidden flex flex-col">
+                        <div class="p-6 border-b border-slate-700">
+                            <h3 class="font-bold font-display">Current Bill</h3>
+                            <p class="text-xs text-slate-400" id="billDateDisplay">-</p>
+                        </div>
+                        
+                        <div class="flex-1 overflow-y-auto scrollbar-custom p-6">
+                            <table class="w-full">
+                                <thead><tr class="text-left text-xs text-slate-400 border-b border-slate-700"><th class="pb-3">Medicine</th><th class="pb-3">Dosage</th><th class="pb-3 text-center">Qty</th><th class="pb-3 text-right">Price</th><th class="pb-3 text-right">Action</th></tr></thead>
+                                <tbody id="billItemsBody"><tr><td colspan="5" class="py-10 text-center text-slate-500">Select a patient to start billing</td></tr></tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-6 bg-slate-900/50 border-t border-slate-700">
+                            <div class="flex justify-between items-center mb-2 text-sm"><span class="text-slate-400">Subtotal</span><span id="billSubtotal">₹ 0</span></div>
+                            <div class="flex justify-between items-center mb-4 text-sm"><span class="text-slate-400">GST (5%)</span><span id="billTax">₹ 0</span></div>
+                            <div class="flex justify-between items-center text-xl font-bold border-t border-slate-600 pt-4 mb-6"><span>Grand Total</span><span class="text-cyan-400" id="billTotal">₹ 0</span></div>
+                            
+                            <button onclick="saveBillToDatabase()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold">Save Bill</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Upload Records Section -->
+            <section id="uploadsSection" class="section-content hidden">
+                <div class="grid lg:grid-cols-2 gap-6">
+                    
+                    <!-- Upload Prescription -->
+                    <div class="bg-slate-800/50 rounded-2xl border border-slate-700 p-6">
+                        <h3 class="font-bold font-display mb-4">Upload Prescription</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Patient ID</label>
+                                <input type="text" id="prescPatientId" placeholder="HMS-XXXX-XXXX" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Doctor Name</label>
+                                <input type="text" id="prescDoctorName" placeholder="Dr. Name" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Department</label>
+                                <input type="text" id="prescDepartment" placeholder="Department" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Upload PDF File</label>
+                                <input type="file" id="prescFileInput" accept="application/pdf" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white file-input cursor-pointer">
+                            </div>
+                            <button onclick="uploadPrescription()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload Prescription
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Upload Lab Result -->
+                    <div class="bg-slate-800/50 rounded-2xl border border-slate-700 p-6">
+                        <h3 class="font-bold font-display mb-4">Upload Lab Result</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Patient ID</label>
+                                <input type="text" id="labPatientId" placeholder="HMS-XXXX-XXXX" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Test Name</label>
+                                <input type="text" id="labTestName" placeholder="CBC, Lipid Profile, etc." class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Lab Name</label>
+                                <input type="text" id="labName" placeholder="Main Lab" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white placeholder-slate-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Upload PDF File</label>
+                                <input type="file" id="labFileInput" accept="application/pdf" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white file-input cursor-pointer">
+                            </div>
+                            <button onclick="uploadLabResult()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload Lab Result
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Add Patient Modal -->
+    <div id="patientModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-custom">
+            <div class="sticky top-0 bg-slate-800 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-bold font-display">Add New Patient</h3>
+                <button onclick="closeModal('patientModal')" class="p-2 hover:bg-slate-700 rounded-lg transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <form id="patientForm" class="grid sm:grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">First Name *</label><input type="text" id="formFirstName" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"></div>
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">Last Name *</label><input type="text" id="formLastName" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"></div>
+                    <div class="sm:col-span-2"><label class="block text-sm font-medium text-slate-300 mb-2">Email *</label><input type="email" id="formEmail" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"></div>
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">Phone *</label><input type="tel" id="formPhone" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"></div>
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">Date of Birth *</label><input type="date" id="formDob" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"></div>
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">Gender *</label><select id="formGender" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"><option value="">Select</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
+                    <div><label class="block text-sm font-medium text-slate-300 mb-2">Blood Group *</label><select id="formBloodGroup" required class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white"><option value="">Select</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
+                </form>
+                <div class="flex gap-4 mt-6">
+                    <button onclick="closeModal('patientModal')" class="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold transition-all">Cancel</button>
+                    <button onclick="savePatient()" class="flex-1 py-3 rounded-xl btn-primary text-white font-semibold">Save Patient</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Department Modal -->
+    <div id="deptModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl max-w-md w-full">
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-bold font-display">Add New Department</h3>
+                <button onclick="closeModal('deptModal')" class="p-2 hover:bg-slate-700 rounded-lg transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Department Name</label>
+                    <input type="text" id="deptName" placeholder="e.g., Cardiology" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white">
+                </div>
+                <button onclick="saveDepartment()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold">Save Department</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Doctor Modal -->
+    <div id="doctorModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl max-w-md w-full">
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-bold font-display">Add New Doctor</h3>
+                <button onclick="closeModal('doctorModal')" class="p-2 hover:bg-slate-700 rounded-lg transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Doctor Name</label>
+                    <input type="text" id="doctorName" placeholder="Dr. Name" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Qualification</label>
+                    <input type="text" id="doctorQualification" placeholder="MBBS, MD" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Department</label>
+                    <select id="doctorDeptSelect" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white">
+                        <option value="">Select Department</option>
+                    </select>
+                </div>
+                <button onclick="saveDoctor()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold">Add Doctor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Token Update Modal -->
+    <div id="tokenUpdateModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl max-w-md w-full">
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-xl font-bold font-display">Update Token</h3>
+                <button onclick="closeModal('tokenUpdateModal')" class="p-2 hover:bg-slate-700 rounded-lg transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="text-2xl font-bold text-cyan-400 mb-1" id="tokenDoctorName">Dr. Name</div>
+                    <div class="text-sm text-slate-400" id="tokenDoctorDept">Department</div>
+                </div>
+                <input type="hidden" id="tokenDoctorId">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Current Token</label>
+                        <input type="number" id="updateCurrentToken" min="0" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white text-center text-2xl font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Last Token</label>
+                        <input type="number" id="updateLastToken" min="0" class="w-full px-4 py-3 rounded-xl input-dark outline-none text-white text-center text-2xl font-bold">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="setDoctorStatus('available')" class="status-btn py-2 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium" data-status="available">Available</button>
+                        <button type="button" onclick="setDoctorStatus('emergency')" class="status-btn py-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium" data-status="emergency">Emergency</button>
+                        <button type="button" onclick="setDoctorStatus('break')" class="status-btn py-2 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-sm font-medium" data-status="break">Break</button>
+                    </div>
+                </div>
+                <button onclick="saveTokenUpdate()" class="w-full py-3 rounded-xl btn-primary text-white font-semibold">Update & Broadcast</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="adminToast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-slate-700 text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 border border-slate-600">
+            <svg class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+            <span id="adminToastMessage">Success!</span>
+        </div>
+    </div>
+
+    <script>
+        // ====================
+        // SUPABASE CONFIGURATION
+        // ====================
+        const SUPABASE_URL = 'https://qjxcszxslvkdsemyxlam.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqeGNzenhzbHZrZHNlbXl4bGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwODQ2NzEsImV4cCI6MjA4NjY2MDY3MX0.gwXWYjmWhiWtVNTKkmKeuU3pc4cASrQ0gXUZUyo-Dr4';
+        
+        const STORAGE_BUCKET = 'medical-records'; 
+
+        const adminSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ====================
+        // STATE MANAGEMENT
+        // ====================
+        let patients = [];
+        let departments = [];
+        let doctors = [];
+        let selectedDoctorStatus = 'available';
+        let currentSelectedDeptId = null;
+        let currentSection = 'dashboard';
+        let adminChannels = [];
+        
+        // Billing State
+        let currentBillPatientId = null;
+        let currentBillItems = []; 
+
+        // ====================
+        // MEDICINE & PRICE MASTER
+        // ====================
+        const medicineMaster = [
+               // Pain & Fever
+            { name: 'Paracetamol 500mg', price: 25 },
+            { name: 'Dolo 650', price: 30 },
+            { name: 'Crocin Advance', price: 35 },
+            { name: 'Ibuprofen 400mg', price: 40 },
+            { name: 'Combiflam', price: 45 },
+            { name: 'Diclofenac 50mg', price: 32 },
+            { name: 'Naproxen 250mg', price: 55 },
+            { name: 'Tramadol 50mg', price: 28 },
+            { name: 'Mefenamic Acid 500mg', price: 35 },
+            
+            // Antibiotics & Infection
+            { name: 'Amoxicillin 500mg', price: 120 },
+            { name: 'Azithromycin 500mg', price: 150 },
+            { name: 'Ciprofloxacin 500mg', price: 35 },
+            { name: 'Doxycycline 100mg', price: 45 },
+            { name: 'Cefixime 200mg', price: 95 },
+            { name: 'Cefuroxime 250mg', price: 110 },
+            { name: 'Metronidazole 400mg', price: 40 },
+            { name: 'Ofloxacin 200mg', price: 50 },
+            { name: 'Linezolid 600mg', price: 180 },
+            
+            // Anti-allergy & Respiratory
+            { name: 'Cetrizine 10mg', price: 20 },
+            { name: 'Allegra 120mg', price: 180 },
+            { name: 'Montelukast 10mg', price: 70 },
+            { name: 'Levocetirizine 5mg', price: 45 },
+            { name: 'Salbutamol Inhaler', price: 130 },
+            { name: 'Budecort Inhaler', price: 250 },
+            { name: 'Ambroxol Syrup 100ml', price: 60 },
+            { name: 'Dextromethorphan Syrup', price: 55 },
+            
+            // Gastrointestinal
+            { name: 'Omeprazole 20mg', price: 65 },
+            { name: 'Pantoprazole 40mg', price: 80 },
+            { name: 'Ranitidine 150mg', price: 18 },
+            { name: 'Domperidone 10mg', price: 22 },
+            { name: 'Antacid Gel 170ml', price: 60 },
+            { name: 'Lactulose Syrup 100ml', price: 55 },
+            { name: 'Ondansetron 4mg', price: 30 },
+            { name: 'Dicyclomine 20mg', price: 35 },
+            
+            // Cardiac & BP
+            { name: 'Amlodipine 5mg', price: 45 },
+            { name: 'Atorvastatin 10mg', price: 110 },
+            { name: 'Losartan 50mg', price: 45 },
+            { name: 'Metoprolol 25mg', price: 38 },
+            { name: 'Aspirin 75mg', price: 12 },
+            { name: 'Clopidogrel 75mg', price: 85 },
+            { name: 'Atenolol 50mg', price: 30 },
+            { name: 'Nifedipine 10mg', price: 35 },
+            
+            // Diabetes
+            { name: 'Metformin 500mg', price: 50 },
+            { name: 'Metformin 1000mg', price: 85 },
+            { name: 'Glimepiride 2mg', price: 55 },
+            { name: 'Sitagliptin 50mg', price: 165 },
+            { name: 'Voglibose 0.2mg', price: 95 },
+            
+            // Vitamins & Supplements
+            { name: 'Vitamin D3 60K', price: 95 },
+            { name: 'Vitamin B12', price: 55 },
+            { name: 'Shelcal 500 (Calcium)', price: 160 },
+            { name: 'Zincovit Tablet', price: 75 },
+            { name: 'Iron Folic Tablet', price: 65 },
+            { name: 'Multivitamin Capsule', price: 80 },
+            { name: 'Folic Acid 5mg', price: 20 },
+            { name: 'Zinc Sulfate 50mg', price: 30 },
+            
+            // Thyroid & Hormones
+            { name: 'Thyroxine 50mcg', price: 35 },
+            { name: 'Thyroxine 100mcg', price: 55 },
+            
+            // Topical & Antiseptics
+            { name: 'Diclofenac Gel 30g', price: 75 },
+            { name: 'Betnovate Cream 20g', price: 52 },
+            { name: 'Soframycin Cream 20g', price: 48 },
+            { name: 'Clotrimazole Powder', price: 45 },
+            { name: 'Povidone Iodine Ointment', price: 40 },
+            { name: 'Calamine Lotion 100ml', price: 35 },
+            
+            // General & Others
+            { name: 'ORS Packet', price: 20 },
+            { name: 'Cough Syrup 100ml', price: 70 },
+            { name: 'Albendazole 400mg', price: 15 },
+            { name: 'Ivermectin 12mg', price: 35 },
+            { name: 'Nasal Drops 10ml', price: 30 },
+            { name: 'Eye Drops 5ml', price: 25 },
+            { name: 'Dolo Syrup 60ml', price: 42 }
+        ];
+
+        function getMedicinePrice(name) {
+            const med = medicineMaster.find(m => m.name.toLowerCase() === name.toLowerCase());
+            if (med) return med.price;
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
+            return (Math.abs(hash) % 100) + 20; 
+        }
+
+        // ====================
+        // INITIALIZATION
+        // ====================
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAdminLoggedIn = localStorage.getItem('medcare_admin');
+            if (isAdminLoggedIn === 'true') {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('dashboardScreen').classList.remove('hidden');
+                await loadDashboardData();
+                startRealTimeUpdates();
+                showAdminToast('Session restored');
+            }
+        });
+
+        // ====================
+        // AUTHENTICATION
+        // ====================
+        async function handleAdminLogin() {
+            const id = document.getElementById('hospitalId').value.trim();
+            const password = document.getElementById('hospitalPassword').value;
+            
+            if (id === 'HOSP-DEMO' && password === 'admin123') {
+                localStorage.setItem('medcare_admin', 'true');
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('dashboardScreen').classList.remove('hidden');
+                await loadDashboardData();
+                startRealTimeUpdates();
+                showAdminToast('Welcome to Management Dashboard');
+            } else {
+                showAdminToast('Invalid credentials. Try HOSP-DEMO / admin123');
+            }
+        }
+
+        function handleAdminLogout() {
+            adminChannels.forEach(channel => adminSupabase.removeChannel(channel));
+            adminChannels = [];
+            localStorage.removeItem('medcare_admin');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            showAdminToast('Logged out successfully');
+        }
+
+        // ====================
+        // NAVIGATION
+        // ====================
+        function showAdminSection(section) {
+            currentSection = section;
+            document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`${section}Section`).classList.remove('hidden');
+            
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.section === section) item.classList.add('active');
+            });
+
+            const titles = {
+                dashboard: { title: 'Dashboard', subtitle: 'Overview' },
+                patients: { title: 'Patient Management', subtitle: 'Manage records' },
+                doctors: { title: 'Doctors & Tokens', subtitle: 'Manage departments and token status' },
+                billing: { title: 'Billing & Pharmacy', subtitle: 'Create invoices and dispense medicines' },
+                uploads: { title: 'Upload Records', subtitle: 'Upload PDF files' }
+            };
+            document.getElementById('pageTitle').textContent = titles[section]?.title || 'Dashboard';
+            document.getElementById('pageSubtitle').textContent = titles[section]?.subtitle || '';
+
+            if (section === 'patients') loadPatientsTable();
+            if (section === 'doctors') { loadDepartmentsSidebar(); loadDoctorsGrid(); }
+            if (section === 'billing') initBillingSection();
+        }
+
+        // ====================
+        // LOAD DATA
+        // ====================
+        async function loadDashboardData() {
+            await loadRealData();
+            loadDashboardTokenBoard();
+            document.getElementById('totalPatients').textContent = patients.length;
+            document.getElementById('activeDoctorsCount').textContent = doctors.filter(d => d.status === 'available').length;
+            document.getElementById('totalDepts').textContent = departments.length;
+        }
+
+        async function loadRealData() {
+            try {
+                const { data: patientsData } = await adminSupabase.from('patients').select('*').order('created_at', { ascending: false });
+                if (patientsData) patients = patientsData;
+                
+                const { data: deptsData } = await adminSupabase.from('departments').select('*').order('name', { ascending: true });
+                if (deptsData) departments = deptsData;
+                
+                const { data: doctorsData } = await adminSupabase.from('doctors').select('*').order('name', { ascending: true });
+                if (doctorsData) doctors = doctorsData;
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        function startRealTimeUpdates() {
+            const doctorChannel = adminSupabase.channel('admin_doctors').on('postgres_changes', { event: '*', schema: 'public', table: 'doctors' }, () => {
+                loadRealData();
+                if (currentSection === 'dashboard') loadDashboardTokenBoard();
+                if (currentSection === 'doctors') loadDoctorsGrid();
+            }).subscribe();
+            adminChannels.push(doctorChannel);
+        }
+
+        function loadDashboardTokenBoard() {
+            const tbody = document.getElementById('dashboardTokenBoardBody');
+            if (doctors.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-500">No doctors</td></tr>'; return; }
+            
+            tbody.innerHTML = doctors.map(doc => {
+                const dept = departments.find(d => d.dept_id === doc.dept_id);
+                return `
+                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all">
+                        <td class="py-3 px-6 font-medium">${dept?.name || 'General'}</td>
+                        <td class="py-3 px-6 text-slate-300">${doc.name}</td>
+                        <td class="py-3 px-6 text-center"><span class="inline-flex items-center justify-center w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold">${doc.current_token || 0}</span></td>
+                        <td class="py-3 px-6 text-center"><span class="px-2 py-1 rounded text-xs ${getStatusClass(doc.status || 'available')}">${capitalizeFirst(doc.status || 'available')}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ====================
+        // PATIENTS
+        // ====================
+        function loadPatientsTable(list = patients) {
+            const tbody = document.getElementById('patientsTableBody');
+            if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-500">No patients</td></tr>'; return; }
+            
+            tbody.innerHTML = list.map(p => `
+                <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all">
+                    <td class="py-4 px-6 font-mono text-cyan-400">${p.patient_id}</td>
+                    <td class="py-4 px-6 font-medium">${p.first_name} ${p.last_name}</td>
+                    <td class="py-4 px-6 text-slate-400">${p.email}</td>
+                    <td class="py-4 px-6 text-slate-400">${p.phone}</td>
+                    <td class="py-4 px-6 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="viewPatientProfile('${p.patient_id}')" class="p-2 hover:bg-cyan-500/20 rounded-lg transition-all" title="View Patient Portal">
+                                <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <button onclick="deletePatient('${p.patient_id}')" class="p-2 hover:bg-red-500/20 rounded-lg transition-all" title="Delete Patient">
+                                <svg class="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function viewPatientProfile(patientId) {
+            const patient = patients.find(p => p.patient_id === patientId);
+            if (!patient) { showAdminToast('Patient not found'); return; }
+            const patientSession = {
+                patientId: patient.patient_id, firstName: patient.first_name, lastName: patient.last_name,
+                email: patient.email, phone: patient.phone, dob: patient.dob, gender: patient.gender, bloodGroup: patient.blood_group
+            };
+            localStorage.setItem('medcare_patient', JSON.stringify(patientSession));
+            showAdminToast('Opening patient portal...');
+            window.open('patient3.html', '_blank');
+        }
+
+        function openAddPatientModal() { document.getElementById('patientForm').reset(); document.getElementById('patientModal').classList.remove('hidden'); }
+
+        async function savePatient() {
+            const data = {
+                first_name: document.getElementById('formFirstName').value,
+                last_name: document.getElementById('formLastName').value,
+                email: document.getElementById('formEmail').value,
+                phone: document.getElementById('formPhone').value,
+                dob: document.getElementById('formDob').value,
+                gender: document.getElementById('formGender').value,
+                blood_group: document.getElementById('formBloodGroup').value,
+                patient_id: generatePatientId(document.getElementById('formEmail').value)
+            };
+            
+            const { error } = await adminSupabase.from('patients').insert([data]);
+            if (error) return showAdminToast('Error: ' + error.message);
+            
+            await loadRealData();
+            closeModal('patientModal');
+            loadPatientsTable();
+            showAdminToast('Patient Added');
+        }
+
+        async function deletePatient(id) {
+            if (!confirm('Delete this patient?')) return;
+            const { error } = await adminSupabase.from('patients').delete().eq('patient_id', id);
+            if (error) return showAdminToast('Error: ' + error.message);
+            await loadRealData(); loadPatientsTable(); showAdminToast('Deleted');
+        }
+        
+        function searchPatients(q) {
+            const query = q.toLowerCase();
+            const filtered = patients.filter(p => p.patient_id.toLowerCase().includes(query) || `${p.first_name} ${p.last_name}`.toLowerCase().includes(query));
+            loadPatientsTable(filtered);
+        }
+
+        // ====================
+        // DEPARTMENTS
+        // ====================
+        function loadDepartmentsSidebar() {
+            const container = document.getElementById('departmentsListSidebar');
+            let html = `<div onclick="selectDepartment(null)" class="dept-item p-3 rounded-xl cursor-pointer mb-1 ${currentSelectedDeptId === null ? 'active' : ''}">All Departments</div>`;
+            html += departments.map(d => `<div onclick="selectDepartment('${d.dept_id}')" class="dept-item p-3 rounded-xl cursor-pointer mb-1 ${currentSelectedDeptId === d.dept_id ? 'active' : ''}">${d.name}</div>`).join('');
+            container.innerHTML = html;
+        }
+
+        function selectDepartment(id) { currentSelectedDeptId = id; loadDepartmentsSidebar(); loadDoctorsGrid(); }
+
+        function openAddDeptModal() { document.getElementById('deptName').value = ''; document.getElementById('deptModal').classList.remove('hidden'); }
+
+        async function saveDepartment() {
+            const name = document.getElementById('deptName').value.trim();
+            if (!name) return showAdminToast('Name required');
+            const id = 'DEPT' + String(departments.length + 1).padStart(3, '0');
+            const { error } = await adminSupabase.from('departments').insert([{ dept_id: id, name }]);
+            if (error) return showAdminToast('Error: ' + error.message);
+            await loadRealData(); closeModal('deptModal'); loadDepartmentsSidebar(); showAdminToast('Added');
+        }
+
+        // ====================
+        // DOCTORS
+        // ====================
+        function loadDoctorsGrid() {
+            const container = document.getElementById('doctorsGrid');
+            const filtered = currentSelectedDeptId ? doctors.filter(d => d.dept_id === currentSelectedDeptId) : doctors;
+            if (!filtered.length) return container.innerHTML = '<div class="col-span-full text-center text-slate-500 py-10">No doctors found</div>';
+            
+            container.innerHTML = filtered.map(d => {
+                const dept = departments.find(x => x.dept_id === d.dept_id);
+                return `<div class="bg-slate-900/50 border border-slate-700 rounded-xl p-4">
+                    <h4 class="font-bold text-white">${d.name}</h4>
+                    <p class="text-xs text-slate-500 mb-3">${dept?.name || 'Unassigned'}</p>
+                    <div class="grid grid-cols-2 gap-2 text-center mb-3">
+                        <div class="bg-slate-800 p-2 rounded-lg"><div class="text-xl font-bold text-cyan-400">${d.current_token || 0}</div><div class="text-xs text-slate-500">Current</div></div>
+                        <div class="bg-slate-800 p-2 rounded-lg"><div class="text-xl font-bold">${d.last_token || 0}</div><div class="text-xs text-slate-500">Last</div></div>
+                    </div>
+                    <button onclick="openTokenUpdateModal('${d.doctor_id}')" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">Manage</button>
+                </div>`;
+            }).join('');
+        }
+
+        function openAddDoctorModal() {
+            const select = document.getElementById('doctorDeptSelect');
+            select.innerHTML = '<option value="">Select</option>' + departments.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+            document.getElementById('doctorModal').classList.remove('hidden');
+        }
+
+        async function saveDoctor() {
+            const name = document.getElementById('doctorName').value;
+            const qualification = document.getElementById('doctorQualification').value;
+            const dept_id = document.getElementById('doctorDeptSelect').value;
+            if (!name || !dept_id) return showAdminToast('Fields required');
+            
+            const id = 'DOC' + String(doctors.length + 1).padStart(3, '0');
+            const { error } = await adminSupabase.from('doctors').insert([{ doctor_id: id, name, dept_id, qualification, current_token: 0, last_token: 0, status: 'available' }]);
+            if (error) return showAdminToast('Error: ' + error.message);
+            
+            await loadRealData(); closeModal('doctorModal'); loadDoctorsGrid(); showAdminToast('Doctor Added');
+        }
+
+        function openTokenUpdateModal(id) {
+            const doc = doctors.find(d => d.doctor_id === id);
+            if (!doc) return;
+            document.getElementById('tokenDoctorId').value = id;
+            document.getElementById('updateCurrentToken').value = doc.current_token || 0;
+            document.getElementById('updateLastToken').value = doc.last_token || 0;
+            selectedDoctorStatus = doc.status || 'available';
+            document.getElementById('tokenUpdateModal').classList.remove('hidden');
+        }
+
+        async function saveTokenUpdate() {
+            const id = document.getElementById('tokenDoctorId').value;
+            const current = parseInt(document.getElementById('updateCurrentToken').value);
+            const last = parseInt(document.getElementById('updateLastToken').value);
+            
+            const { error } = await adminSupabase.from('doctors').update({ current_token: current, last_token: last, status: selectedDoctorStatus }).eq('doctor_id', id);
+            if (error) return showAdminToast('Error: ' + error.message);
+            
+            await loadRealData(); closeModal('tokenUpdateModal'); loadDoctorsGrid(); loadDashboardTokenBoard(); showAdminToast('Updated');
+        }
+
+        function setDoctorStatus(s) { selectedDoctorStatus = s; }
+
+        // ====================
+        // BILLING MODULE
+        // ====================
+        function initBillingSection() {
+            document.getElementById('billDateDisplay').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            // Reset state
+            document.getElementById('billPatientSearchInput').value = '';
+            document.getElementById('selectedPatientInfo').classList.add('hidden');
+            currentBillPatientId = null;
+            currentBillItems = [];
+            renderCurrentBill();
+        }
+
+        // --- Patient Search Logic ---
+        function handlePatientSearchInput(query) {
+            const container = document.getElementById('patientSearchResults');
+            if (!query) { container.classList.remove('active'); return; }
+            
+            const filtered = patients.filter(p => 
+                p.patient_id.toLowerCase().includes(query.toLowerCase()) || 
+                `${p.first_name} ${p.last_name}`.toLowerCase().includes(query.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="search-result-item text-slate-400">No patient found</div>`;
+            } else {
+                container.innerHTML = filtered.map(p => `
+                    <div class="search-result-item" onclick="selectPatientForBilling('${p.patient_id}')">
+                        <div>
+                            <div class="font-medium text-white">${p.first_name} ${p.last_name}</div>
+                            <div class="text-xs text-slate-400">${p.patient_id}</div>
+                        </div>
+                        <div class="text-xs text-cyan-400">Select</div>
+                    </div>
+                `).join('');
+            }
+            container.classList.add('active');
+        }
+
+        function selectPatientForBilling(id) {
+            const patient = patients.find(p => p.patient_id === id);
+            if (patient) {
+                currentBillPatientId = patient.patient_id;
+                document.getElementById('billPatientSearchInput').value = `${patient.first_name} ${patient.last_name} (${patient.patient_id})`;
+                document.getElementById('billPatientName').textContent = `${patient.first_name} ${patient.last_name}`;
+                document.getElementById('billPatientId').textContent = patient.patient_id;
+                document.getElementById('selectedPatientInfo').classList.remove('hidden');
+                document.getElementById('patientSearchResults').classList.remove('active'); 
+                // Clear previous bill items when new patient selected
+                currentBillItems = [];
+                renderCurrentBill();
+            }
+        }
+
+        // --- Medicine Search Logic ---
+        function handleMedicineSearchInput(query) {
+            const container = document.getElementById('medicineSearchResults');
+            if (!query) { container.classList.remove('active'); return; }
+
+            const filtered = medicineMaster.filter(m => m.name.toLowerCase().includes(query.toLowerCase()));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="search-result-item text-slate-400">No medicine found</div>`;
+            } else {
+                container.innerHTML = filtered.map(m => `
+                    <div class="search-result-item" onclick="selectMedicineForBilling('${m.name}')">
+                        <span class="text-white">${m.name}</span>
+                        <span class="text-green-400 font-mono text-sm">₹${m.price}</span>
+                    </div>
+                `).join('');
+            }
+            container.classList.add('active');
+        }
+
+        function selectMedicineForBilling(name) {
+            document.getElementById('billMedName').value = name;
+            document.getElementById('medicineSearchResults').classList.remove('active');
+            updateLivePrice();
+        }
+
+        function updateLivePrice() {
+            const name = document.getElementById('billMedName').value;
+            const qty = parseInt(document.getElementById('billMedQty').value) || 0;
+            const price = getMedicinePrice(name) * qty;
+            document.getElementById('liveMedPrice').textContent = '₹ ' + price;
+        }
+
+        // --- Bill Management Logic ---
+
+        function addToCurrentBill() {
+            if (!currentBillPatientId) return showAdminToast('Please select a patient first');
+            
+            const name = document.getElementById('billMedName').value.trim();
+            const dosage = document.getElementById('billMedDosage').value.trim();
+            const qty = parseInt(document.getElementById('billMedQty').value);
+
+            if (!name || !qty) return showAdminToast('Medicine Name and Quantity required');
+
+            currentBillItems.push({
+                tempId: Date.now(), 
+                name: name,
+                dosage: dosage,
+                quantity: qty,
+                price: getMedicinePrice(name)
+            });
+
+            showAdminToast('Added to list');
+            
+            document.getElementById('billMedName').value = '';
+            document.getElementById('billMedDosage').value = '';
+            document.getElementById('billMedQty').value = '';
+            document.getElementById('liveMedPrice').textContent = '₹ 0';
+
+            renderCurrentBill();
+        }
+
+        function removeFromCurrentBill(tempId) {
+            currentBillItems = currentBillItems.filter(item => item.tempId !== tempId);
+            renderCurrentBill();
+        }
+
+        function renderCurrentBill() {
+            const tbody = document.getElementById('billItemsBody');
+            
+            if (!currentBillPatientId) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500">Select a patient to start</td></tr>';
+                resetTotals();
+                return;
+            }
+
+            if (currentBillItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500">No items added yet</td></tr>';
+                resetTotals();
+                return;
+            }
+
+            let subtotal = 0;
+            tbody.innerHTML = currentBillItems.map(item => {
+                const total = item.price * item.quantity;
+                subtotal += total;
+                return `<tr class="border-b border-slate-700/30">
+                    <td class="py-3 font-medium text-white">${item.name}</td>
+                    <td class="py-3 text-slate-400 text-sm">${item.dosage || '-'}</td>
+                    <td class="py-3 text-center">${item.quantity}</td>
+                    <td class="py-3 text-right text-green-400 font-mono">₹ ${total}</td>
+                    <td class="py-3 text-right">
+                        <button onclick="removeFromCurrentBill(${item.tempId})" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded bg-red-500/10">Remove</button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            const tax = subtotal * 0.05;
+            const total = subtotal + tax;
+            document.getElementById('billSubtotal').textContent = '₹ ' + subtotal;
+            document.getElementById('billTax').textContent = '₹ ' + tax.toFixed(0);
+            document.getElementById('billTotal').textContent = '₹ ' + total.toFixed(0);
+        }
+
+        function resetTotals() {
+            document.getElementById('billSubtotal').textContent = '₹ 0';
+            document.getElementById('billTax').textContent = '₹ 0';
+            document.getElementById('billTotal').textContent = '₹ 0';
+        }
+
+        async function saveBillToDatabase() {
+            if (!currentBillPatientId) return showAdminToast('Select a patient first');
+            if (currentBillItems.length === 0) return showAdminToast('Add items to the bill first');
+
+            showAdminToast('Saving Bill...');
+
+            const insertPromises = currentBillItems.map(item => {
+                return adminSupabase.from('medicines').insert([{
+                    medicine_id: 'MED-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(4),
+                    patient_id: currentBillPatientId,
+                    name: item.name,
+                    dosage: item.dosage,
+                    quantity: item.quantity
+                }]);
+            });
+
+            try {
+                await Promise.all(insertPromises);
+                showAdminToast('Bill Saved Successfully!');
+                currentBillItems = [];
+                renderCurrentBill();
+            } catch (error) {
+                showAdminToast('Error saving bill: ' + error.message);
+            }
+        }
+
+        // ====================
+        // UPLOADS
+        // ====================
+        
+        async function uploadFileToStorage(file, folder) {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            
+            const { data, error } = await adminSupabase.storage
+                .from(STORAGE_BUCKET)
+                .upload(fileName, file);
+
+            if (error) throw error;
+            const { data: urlData } = adminSupabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+            return urlData.publicUrl;
+        }
+
+        async function uploadPrescription() {
+            const patientId = document.getElementById('prescPatientId').value.trim();
+            const doctorName = document.getElementById('prescDoctorName').value.trim();
+            const department = document.getElementById('prescDepartment').value.trim();
+            const fileInput = document.getElementById('prescFileInput');
+            const file = fileInput.files[0];
+
+            if (!patientId || !doctorName || !department) return showAdminToast('Fill all text fields');
+            if (!file) return showAdminToast('Please select a PDF file');
+
+            showAdminToast('Uploading file...');
+
+            try {
+                const fileUrl = await uploadFileToStorage(file, 'prescriptions');
+                const { error } = await adminSupabase.from('prescriptions').insert([{
+                    prescription_id: 'RX' + Date.now(),
+                    patient_id: patientId,
+                    doctor_name: doctorName,
+                    department: department,
+                    file_url: fileUrl
+                }]);
+
+                if (error) throw error;
+
+                showAdminToast('Prescription Uploaded Successfully');
+                document.getElementById('prescPatientId').value = '';
+                document.getElementById('prescDoctorName').value = '';
+                document.getElementById('prescDepartment').value = '';
+                fileInput.value = '';
+
+            } catch (err) {
+                showAdminToast('Upload failed: ' + err.message);
+            }
+        }
+
+        async function uploadLabResult() {
+            const patientId = document.getElementById('labPatientId').value.trim();
+            const testName = document.getElementById('labTestName').value.trim();
+            const labName = document.getElementById('labName').value.trim();
+            const fileInput = document.getElementById('labFileInput');
+            const file = fileInput.files[0];
+
+            if (!patientId || !testName) return showAdminToast('Fill required fields');
+            if (!file) return showAdminToast('Please select a PDF file');
+
+            showAdminToast('Uploading file...');
+
+            try {
+                const fileUrl = await uploadFileToStorage(file, 'lab_results');
+                const { error } = await adminSupabase.from('lab_results').insert([{
+                    lab_id: 'LAB' + Date.now(),
+                    patient_id: patientId,
+                    test_name: testName,
+                    lab_name: labName,
+                    file_url: fileUrl
+                }]);
+
+                if (error) throw error;
+
+                showAdminToast('Lab Result Uploaded Successfully');
+                document.getElementById('labPatientId').value = '';
+                document.getElementById('labTestName').value = '';
+                document.getElementById('labName').value = '';
+                fileInput.value = '';
+
+            } catch (err) {
+                showAdminToast('Upload failed: ' + err.message);
+            }
+        }
+
+        // ====================
+        // UTILITIES
+        // ====================
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function getStatusClass(s) { return { available: 'bg-green-500/20 text-green-400', emergency: 'bg-red-500/20 text-red-400', break: 'bg-amber-500/20 text-amber-400' }[s] || 'bg-slate-500/20 text-slate-400'; }
+        function capitalizeFirst(s) { return s ? s[0].toUpperCase() + s.slice(1) : ''; }
+        function showAdminToast(msg) { const t = document.getElementById('adminToast'); document.getElementById('adminToastMessage').textContent = msg; t.classList.remove('translate-y-20', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000); }
+        function generatePatientId(email) { let h = 0; for (let i = 0; i < email.length; i++) h = Math.abs(((h << 5) - h) + email.charCodeAt(i)); return `HMS-${String(h % 10000).padStart(4, '0')}-${String(Math.floor(h / 10000) % 10000).padStart(4, '0')}`; }
+        
+        // Close search lists when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#billPatientSearchInput') && !e.target.closest('#patientSearchResults')) {
+                document.getElementById('patientSearchResults').classList.remove('active');
+            }
+            if (!e.target.closest('#billMedName') && !e.target.closest('#medicineSearchResults')) {
+                document.getElementById('medicineSearchResults').classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
